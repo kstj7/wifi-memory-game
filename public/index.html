@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Memory Card Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2c3e50;
+            color: white;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        #info-panel {
+            background: #34495e;
+            padding: 15px 30px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            max-width: 600px;
+        }
+        .card {
+            width: 80px;
+            height: 120px;
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: scale(1.05);
+        }
+        .card.hidden {
+            background-color: #e74c3c;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, #c0392b 10px, #c0392b 20px);
+            color: transparent;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover { background-color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <h1>1 to 10 Memory Game</h1>
+    <div id="info-panel">
+        <h2 id="role-display">Connecting...</h2>
+        <h3 id="turn-display">Waiting for players...</h3>
+        <p>Next Card to Find: <strong id="expected-display">1 (Ace)</strong></p>
+    </div>
+    <div id="game-board"></div>
+    <button onclick="restartGame()">Restart Game</button>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let myRole = '';
+        const board = document.getElementById('game-board');
+        const roleDisplay = document.getElementById('role-display');
+        const turnDisplay = document.getElementById('turn-display');
+        const expectedDisplay = document.getElementById('expected-display');
+
+        socket.on('role', (role) => {
+            myRole = role;
+            roleDisplay.innerText = `You are: ${role}`;
+        });
+
+        socket.on('gameState', (state) => {
+            if (state.playersCount < 2) {
+                turnDisplay.innerText = "Waiting for Player 2 to join...";
+            } else {
+                turnDisplay.innerText = `Current Turn: ${state.currentPlayer}`;
+                turnDisplay.style.color = state.currentPlayer === myRole ? '#f1c40f' : 'white';
+            }
+            expectedDisplay.innerText = state.expectedValue === 1 ? "1 (Ace)" : state.expectedValue;
+            renderBoard(state.cards);
+        });
+
+        socket.on('gameOver', (message) => {
+            turnDisplay.innerText = `🎉 ${message} 🎉`;
+            turnDisplay.style.color = '#2ecc71';
+            expectedDisplay.innerText = "Game Over!";
+        });
+
+        function renderBoard(cards) {
+            board.innerHTML = '';
+            cards.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.classList.add('card');
+                if (card.isFlipped) {
+                    cardElement.innerText = card.value === 1 ? 'A' : card.value;
+                } else {
+                    cardElement.classList.add('hidden');
+                }
+                cardElement.onclick = () => socket.emit('flipCard', index);
+                board.appendChild(cardElement);
+            });
+        }
+        function restartGame() { socket.emit('restart'); }
+    </script>
+</body>
+</html>
